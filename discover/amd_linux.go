@@ -67,57 +67,65 @@ var (
 
 // Check for valid APU an linux kenel version to use GTT memory insted VRAM memory
 func GTTmemoryOnAPU(gfx string) (bool, error) {
-	// Check kernel version
-	cmd := exec.Command("uname", "-r")
-	output, err := cmd.Output()
-	if err != nil {
-		return false, fmt.Errorf("error executing uname command: %w", err)
-	}
+    // Check kernel version
+    cmd := exec.Command("uname", "-r")
+    output, err := cmd.Output()
+    if err != nil {
+        return false, fmt.Errorf("error executing uname command: %w", err)
+    }
 
-	fullKernelVersion := strings.TrimSpace(string(output))
+    fullKernelVersion := strings.TrimSpace(string(output))
+    versionParts := strings.Split(fullKernelVersion, ".")
+    if len(versionParts) < 3 {
+        return false, fmt.Errorf("unable to parse kernel version: %s", fullKernelVersion)
+    }
 
-	// Split by "-" and take the first part, or use the whole string if no "-" is present
-	versionPart := fullKernelVersion
-	if parts := strings.SplitN(fullKernelVersion, "-", 2); len(parts) > 1 {
-		versionPart = parts[0]
-	}
+    major, err := strconv.Atoi(versionParts[0])
+    if err != nil {
+        return false, fmt.Errorf("error parsing major version: %w", err)
+    }
 
-	versionParts := strings.Split(versionPart, ".")
-	if len(versionParts) < 3 {
-		return false, fmt.Errorf("unable to parse kernel version: %s", fullKernelVersion)
-	}
+    minor, err := strconv.Atoi(versionParts[1])
+    if err != nil {
+        return false, fmt.Errorf("error parsing minor version: %w", err)
+    }
 
-	major, err := strconv.Atoi(versionParts[0])
-	if err != nil {
-		return false, fmt.Errorf("error parsing major version: %w", err)
-	}
+    // Extract only the numeric part at the beginning of the patch version
+    patchStr := versionParts[2]
+    patchNumeric := ""
+    for _, c := range patchStr {
+        if c >= '0' && c <= '9' {
+            patchNumeric += string(c)
+        } else {
+            // Stop at the first non-numeric character
+            break
+        }
+    }
 
-	minor, err := strconv.Atoi(versionParts[1])
-	if err != nil {
-		return false, fmt.Errorf("error parsing minor version: %w", err)
-	}
+    if patchNumeric == "" {
+        return false, fmt.Errorf("unable to parse numeric part of patch version: %s", patchStr)
+    }
 
-	patch, err := strconv.Atoi(versionParts[2])
-	if err != nil {
-		return false, fmt.Errorf("error parsing patch version: %w", err)
-	}
+    patch, err := strconv.Atoi(patchNumeric)
+    if err != nil {
+        return false, fmt.Errorf("error parsing patch version: %w", err)
+    }
 
-	kernelVersionValid := (major > 6 || (major == 6 && minor > 9) || (major == 6 && minor == 9 && patch >= 9))
+    kernelVersionValid := (major > 6 || (major == 6 && minor > 9) || (major == 6 && minor == 9 && patch >= 9))
 
-	gfxValid := false
-	for _, validGfx := range APUvalidForGTT {
-		if strings.Contains(gfx, validGfx) {
-			gfxValid = true
-			break
-		}
-	}
+    gfxValid := false
+    for _, validGfx := range APUvalidForGTT {
+        if strings.Contains(gfx, validGfx) {
+            gfxValid = true
+            break
+        }
+    }
 
-	if kernelVersionValid && gfxValid {
-		slog.Debug("AMD APU valid to use GTT memory")
-	}
+    if kernelVersionValid && gfxValid {
+        slog.Debug("AMD APU valid to use GTT memory")
+    }
 
-	return kernelVersionValid && gfxValid, nil
-
+    return kernelVersionValid && gfxValid, nil
 }
 
 // Gather GPU information from the amdgpu driver if any supported GPUs are detected
