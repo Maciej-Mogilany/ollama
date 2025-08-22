@@ -75,14 +75,7 @@ func GTTmemoryOnAPU(gfx string) (bool, error) {
 	}
 
 	fullKernelVersion := strings.TrimSpace(string(output))
-
-	// Split by "-" and take the first part, or use the whole string if no "-" is present
-	versionPart := fullKernelVersion
-	if parts := strings.SplitN(fullKernelVersion, "-", 2); len(parts) > 1 {
-		versionPart = parts[0]
-	}
-
-	versionParts := strings.Split(versionPart, ".")
+	versionParts := strings.Split(fullKernelVersion, ".")
 	if len(versionParts) < 3 {
 		return false, fmt.Errorf("unable to parse kernel version: %s", fullKernelVersion)
 	}
@@ -97,7 +90,23 @@ func GTTmemoryOnAPU(gfx string) (bool, error) {
 		return false, fmt.Errorf("error parsing minor version: %w", err)
 	}
 
-	patch, err := strconv.Atoi(versionParts[2])
+	// Extract only the numeric part at the beginning of the patch version
+	patchStr := versionParts[2]
+	patchNumeric := ""
+	for _, c := range patchStr {
+		if c >= '0' && c <= '9' {
+			patchNumeric += string(c)
+		} else {
+			// Stop at the first non-numeric character
+			break
+		}
+	}
+
+	if patchNumeric == "" {
+		return false, fmt.Errorf("unable to parse numeric part of patch version: %s", patchStr)
+	}
+
+	patch, err := strconv.Atoi(patchNumeric)
 	if err != nil {
 		return false, fmt.Errorf("error parsing patch version: %w", err)
 	}
@@ -117,7 +126,6 @@ func GTTmemoryOnAPU(gfx string) (bool, error) {
 	}
 
 	return kernelVersionValid && gfxValid, nil
-
 }
 
 // Gather GPU information from the amdgpu driver if any supported GPUs are detected
